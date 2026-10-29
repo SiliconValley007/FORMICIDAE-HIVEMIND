@@ -3,11 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <title>FORMICIDAE: HIVEMIND</title>
+    <meta
+      name="description"
+      content="Thousands of agents. Pheromone-driven AI. Lead your colony through 20 waves in one HTML file."
+    />
+    <meta name="theme-color" content="#14110d" />
+    <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta
       name="viewport"
       content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <meta property="og:title" content="FORMICIDAE: HIVEMIND" />
+    <meta
+      property="og:description"
+      content="Thousands of agents. Pheromone-driven AI. One HTML file."
+    />
+    <link
+      rel="canonical"
+      href="https://siliconvalley007.github.io/FORMICIDAE-HIVEMIND/"
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://siliconvalley007.github.io/FORMICIDAE-HIVEMIND/"
+    />
+    <meta
+      property="og:image"
+      content="https://siliconvalley007.github.io/FORMICIDAE-HIVEMIND/icon-512.png"
+    />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="FORMICIDAE: HIVEMIND" />
+    <meta
+      name="twitter:description"
+      content="Thousands of agents. Pheromone-driven AI. One HTML file."
+    />
+    <meta
+      name="twitter:image"
+      content="https://siliconvalley007.github.io/FORMICIDAE-HIVEMIND/icon-512.png"
     />
     <style>
       :root {
@@ -15,6 +58,7 @@
         --sar: env(safe-area-inset-right, 0px);
         --sab: env(safe-area-inset-bottom, 0px);
         --sal: env(safe-area-inset-left, 0px);
+        color-scheme: dark;
       }
       html,
       body {
@@ -28,6 +72,7 @@
         touch-action: none;
         -webkit-user-select: none;
         user-select: none;
+        color-scheme: dark;
       }
       canvas {
         display: block;
@@ -44,11 +89,46 @@
         pointer-events: none;
         visibility: hidden;
       }
+      #err {
+        display: none;
+        position: fixed;
+        left: max(12px, env(safe-area-inset-left, 0px));
+        right: max(12px, env(safe-area-inset-right, 0px));
+        bottom: max(12px, env(safe-area-inset-bottom, 0px));
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 10px 12px;
+        background: rgba(40, 16, 12, 0.92);
+        color: #f0e6d0;
+        font: 13px/1.4 sans-serif;
+        border: 1px solid rgba(255, 120, 90, 0.45);
+        z-index: 9;
+        pointer-events: auto;
+      }
+      #err b {
+        display: block;
+        margin-bottom: 4px;
+      }
+      noscript {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #e9d8a0;
+        background: #14110d;
+        font: 16px sans-serif;
+        text-align: center;
+        padding: 24px;
+        z-index: 10;
+      }
     </style>
   </head>
   <body>
     <canvas id="c"></canvas>
     <div id="safe"></div>
+    <div id="err"></div>
+    <noscript>JavaScript is required to play FORMICIDAE: HIVEMIND.</noscript>
     <script>
       /* ==================== SIMULATION: typed-array swarm, pheromone field, combat ==================== */
       (function (g) {
@@ -1100,11 +1180,45 @@
       "use strict";
       /* ==================== RENDERING: canvas + simulation instance ==================== */
       const cv = document.getElementById("c"),
-        ctx = cv.getContext("2d", { alpha: false }),
+        ctx = cv.getContext("2d", { alpha: false }) || cv.getContext("2d"),
         S = Sim.create((Date.now() % 1e9) + 1);
+      if (!ctx) {
+        const e = document.getElementById("err");
+        if (e) {
+          e.style.display = "block";
+          e.textContent = "Canvas 2D is required.";
+        }
+      }
+      const memStore = Object.create(null);
+      let storeOk = true;
+      const SCHEMA = 1;
+      function lsGet(k) {
+        try {
+          if (storeOk) {
+            const v = localStorage.getItem(k);
+            if (v != null) memStore[k] = v;
+            return v;
+          }
+        } catch (e) {
+          storeOk = false;
+        }
+        return memStore[k] != null ? memStore[k] : null;
+      }
+      function lsSet(k, v) {
+        memStore[k] = v;
+        try {
+          if (storeOk) localStorage.setItem(k, v);
+        } catch (e) {
+          storeOk = false;
+        }
+      }
       try {
-        const hs = +(localStorage.getItem("fh_hiscore") || 0),
-          hw = +(localStorage.getItem("fh_hiwave") || 0);
+        if (+(lsGet("fh_schema") || 0) !== SCHEMA)
+          lsSet("fh_schema", String(SCHEMA));
+      } catch (e) {}
+      try {
+        const hs = +(lsGet("fh_hiscore") || 0),
+          hw = +(lsGet("fh_hiwave") || 0);
         S.highScore = isFinite(hs) && hs > 0 ? hs : 0;
         S.highWave = isFinite(hw) && hw > 0 ? hw : 0;
       } catch (e) {}
@@ -1112,10 +1226,30 @@
         try {
           if (S.score > S.highScore) S.highScore = S.score;
           if (S.wave > S.highWave) S.highWave = S.wave;
-          localStorage.setItem("fh_hiscore", S.highScore | 0);
-          localStorage.setItem("fh_hiwave", S.highWave | 0);
+          lsSet("fh_hiscore", String(S.highScore | 0));
+          lsSet("fh_hiwave", String(S.highWave | 0));
         } catch (e) {}
       }
+      const errEl = document.getElementById("err");
+      function showErr(msg) {
+        if (!errEl) return;
+        errEl.style.display = "block";
+        errEl.innerHTML =
+          "<b>Something went wrong</b>" +
+          String(msg || "error").slice(0, 160) +
+          " — tap to dismiss";
+      }
+      if (errEl)
+        errEl.addEventListener("click", () => {
+          errEl.style.display = "none";
+        });
+      window.onerror = function (m) {
+        showErr(m);
+        return true;
+      };
+      window.onunhandledrejection = function (ev) {
+        showErr(ev && ev.reason ? ev.reason : "promise");
+      };
       const W = S.W,
         H = S.H,
         GW = S.GW,
@@ -1126,7 +1260,8 @@
         VY = S.VY,
         T = S.T,
         CR = S.CR;
-      let AC = null,
+      let vol = 1,
+        AC = null,
         MG = null,
         VP = [],
         DR = null,
@@ -1151,9 +1286,14 @@
         if (AC) return AC;
         const ACtor = window.AudioContext || window.webkitAudioContext;
         if (!ACtor) return null;
-        AC = new ACtor();
+        try {
+          AC = new ACtor();
+        } catch (e) {
+          AC = null;
+          return null;
+        }
         MG = AC.createGain();
-        MG.gain.value = 0.35;
+        MG.gain.value = 0.35 * vol;
         MG.connect(AC.destination);
         const hasPan = typeof AC.createStereoPanner === "function";
         for (let k = 0; k < 6; k++) {
@@ -1174,7 +1314,6 @@
         DG.gain.value = 0;
         DR.connect(DG);
         DG.connect(MG);
-        DR.start();
         TR = AC.createOscillator();
         TR.type = "sawtooth";
         TR.frequency.value = 62;
@@ -1182,7 +1321,6 @@
         TG.gain.value = 0;
         TR.connect(TG);
         TG.connect(MG);
-        TR.start();
         CH = AC.createOscillator();
         CH.type = "square";
         CH.frequency.value = 88;
@@ -1190,46 +1328,61 @@
         CG.gain.value = 0;
         CH.connect(CG);
         CG.connect(MG);
-        CH.start();
+        try {
+          DR.start();
+          TR.start();
+          CH.start();
+        } catch (e) {}
         return AC;
       }
-      function snd(freq, dur, vol, type, pan) {
-        if (!AC || AC.state !== "running" || muted) return;
-        let v = VP[0];
-        for (const p of VP)
-          if (p.until <= AC.currentTime) {
-            v = p;
-            break;
-          } else if (p.until < v.until) v = p;
-        freq *= 1 + (Math.random() - 0.5) * 0.08;
-        const t = AC.currentTime;
-        const o = AC.createOscillator();
-        o.type = type || "sine";
-        o.frequency.setValueAtTime(freq, t);
-        o.frequency.exponentialRampToValueAtTime(
-          Math.max(30, freq * 0.6),
-          t + dur,
-        );
-        if (v.p) v.p.pan.setValueAtTime(Math.max(-1, Math.min(1, pan || 0)), t);
-        v.g.gain.cancelScheduledValues(t);
-        v.g.gain.setValueAtTime(v.g.gain.value, t);
-        v.g.gain.linearRampToValueAtTime(Math.min(1, vol), t + 0.01);
-        v.g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-        o.connect(v.g);
-        o.start(t);
-        o.stop(t + dur + 0.02);
-        v.until = t + dur;
+      function snd(freq, dur, svol, type, pan) {
+        if (!AC || AC.state !== "running" || muted || vol <= 0) return;
+        try {
+          let v = VP[0];
+          for (const p of VP)
+            if (p.until <= AC.currentTime) {
+              v = p;
+              break;
+            } else if (p.until < v.until) v = p;
+          freq *= 1 + (Math.random() - 0.5) * 0.08;
+          const t = AC.currentTime;
+          const o = AC.createOscillator();
+          o.type = type || "sine";
+          o.frequency.setValueAtTime(freq, t);
+          o.frequency.exponentialRampToValueAtTime(
+            Math.max(30, freq * 0.6),
+            t + dur,
+          );
+          if (v.p)
+            v.p.pan.setValueAtTime(Math.max(-1, Math.min(1, pan || 0)), t);
+          v.g.gain.cancelScheduledValues(t);
+          v.g.gain.setValueAtTime(v.g.gain.value, t);
+          v.g.gain.linearRampToValueAtTime(Math.min(1, svol), t + 0.01);
+          v.g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          o.connect(v.g);
+          o.start(t);
+          o.stop(t + dur + 0.02);
+          v.until = t + dur;
+        } catch (e) {}
       }
       function unlockAudio() {
-        const c = actx();
-        if (c && c.state === "suspended") c.resume();
+        try {
+          const c = actx();
+          if (c && c.state === "suspended") {
+            const p = c.resume();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
       }
-      addEventListener("pointerdown", unlockAudio, { once: true });
-      addEventListener("keydown", unlockAudio, { once: true });
-      addEventListener("touchstart", unlockAudio, {
-        once: true,
-        passive: true,
-      });
+      function applyMasterGain() {
+        if (MG && AC)
+          try {
+            MG.gain.setValueAtTime(muted ? 0 : 0.35 * vol, AC.currentTime);
+          } catch (e) {}
+      }
+      ["pointerdown", "keydown", "touchstart"].forEach((n) =>
+        addEventListener(n, unlockAudio, { passive: true }),
+      );
       let fn = 0,
         cw = 1,
         ch = 1,
@@ -1244,6 +1397,8 @@
         heat = false,
         fps = 60,
         quality = 2,
+        qMode = 0,
+        qDpr = 1,
         startT = performance.now(),
         pauseA = 0,
         pressBtn = -1,
@@ -1285,12 +1440,35 @@
         reliefT = 0,
         upgradeRippleT = 0,
         upgradeRippleCol = "#c6a0ff";
-      let muted = false;
+      let muted = false,
+        fxOn = true,
+        reduceMotion = false;
       try {
-        muted = localStorage.getItem("fh_muted") === "1";
+        muted = lsGet("fh_muted") === "1";
+        const vs = +(lsGet("fh_vol") || 1);
+        vol = isFinite(vs) ? Math.max(0, Math.min(1, vs)) : 1;
+        const qm = +(lsGet("fh_qmode") || 0);
+        qMode = qm === 1 || qm === 2 ? qm : 0;
+        fxOn = lsGet("fh_fx") !== "0";
       } catch (e) {}
+      try {
+        reduceMotion = !!(
+          window.matchMedia &&
+          matchMedia("(prefers-reduced-motion: reduce)").matches
+        );
+        if (reduceMotion) fxOn = false;
+      } catch (e) {}
+      if (qMode === 1) {
+        quality = 2;
+        qDpr = 2;
+      } else if (qMode === 2) {
+        quality = 0;
+        qDpr = 0.7;
+      }
+      const QNAME = ["Auto", "High", "Low"];
       let gameStarted = false,
-        titlePulseT = 0;
+        titlePulseT = 0,
+        dragVol = false;
       function startGame() {
         if (gameStarted) return;
         gameStarted = true;
@@ -1300,7 +1478,7 @@
       }
       let tutDone = false;
       try {
-        tutDone = localStorage.getItem("fh_tut") === "1";
+        tutDone = lsGet("fh_tut") === "1";
       } catch (e) {}
       let tutStep = tutDone ? 5 : 0,
         tutMoveDist = 0,
@@ -1346,7 +1524,7 @@
           nx.fill();
         }
       }
-      const noisePat = ctx.createPattern(noiseC, "repeat");
+      const noisePat = ctx ? ctx.createPattern(noiseC, "repeat") : null;
       const gc = document.createElement("canvas"),
         gx = gc.getContext("2d");
       let gw2 = 80,
@@ -1365,26 +1543,67 @@
           safeL = parseFloat(cs.paddingLeft) || 0;
         } catch (e) {}
       }
+      let nestGrad = null,
+        queenGrad = null,
+        lastDpr = 0,
+        lastCw = 0,
+        lastCh = 0;
+      function applyDpr() {
+        const cap =
+          qMode === 2
+            ? 0.85
+            : qMode === 1
+              ? 2
+              : Math.max(0.6, Math.min(2, qDpr));
+        dpr = Math.min(window.devicePixelRatio || 1, cap);
+        const tw = Math.round(cw * dpr),
+          th = Math.round(ch * dpr);
+        if (cv.width !== tw || cv.height !== th) {
+          cv.width = tw;
+          cv.height = th;
+        }
+        lastDpr = dpr;
+        lastCw = cw;
+        lastCh = ch;
+      }
       function resize() {
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
         cw = innerWidth || 1;
         ch = innerHeight || 1;
-        cv.width = Math.round(cw * dpr);
-        cv.height = Math.round(ch * dpr);
+        if (window.visualViewport) {
+          cw = visualViewport.width || cw;
+          ch = visualViewport.height || ch;
+        }
+        applyDpr();
         zb = Math.max(0.6, Math.min(2, Math.min(cw, ch) / 700));
         gw2 = Math.max(40, (cw / 8) | 0);
         gh2 = Math.max(25, (ch / 8) | 0);
-        gc.width = gw2;
-        gc.height = gh2;
+        if (gc.width !== gw2 || gc.height !== gh2) {
+          gc.width = gw2;
+          gc.height = gh2;
+        }
+        nestGrad = null;
+        queenGrad = null;
+        lastDpr = dpr;
+        lastCw = cw;
+        lastCh = ch;
         readSafe();
       }
       addEventListener("resize", resize);
       addEventListener("orientationchange", () => setTimeout(resize, 200));
       if (window.visualViewport)
         visualViewport.addEventListener("resize", resize);
-      ["gesturestart", "contextmenu", "dblclick"].forEach((n) =>
-        addEventListener(n, (e) => e.preventDefault()),
+      ["gesturestart", "gesturechange", "gestureend", "contextmenu"].forEach(
+        (n) => addEventListener(n, (e) => e.preventDefault()),
       );
+      addEventListener(
+        "touchmove",
+        (e) => {
+          if (e.touches && e.touches.length > 1) e.preventDefault();
+        },
+        { passive: false },
+      );
+      addEventListener("webglcontextlost", (e) => e.preventDefault());
+      cv.addEventListener("webglcontextlost", (e) => e.preventDefault());
       resize();
       /* ==================== INPUT: keyboard, mouse, touch, abilities ==================== */
       const keys = {};
@@ -1400,77 +1619,186 @@
         pl = null,
         pp = null,
         painting = false,
-        paused = false;
+        paused = false,
+        gpPrev = 0,
+        gpAx = 0,
+        gpAy = 0;
       const pauseBtn = () => ({
         x: cw - 48 - safeR,
         y: 14 + safeT,
         w: 34,
         h: 34,
       });
+      function canFS() {
+        try {
+          if (/iP(hone|ad|od)/.test(navigator.userAgent || "")) return false;
+          const el = document.documentElement;
+          return !!(
+            document.fullscreenEnabled ||
+            document.webkitFullscreenEnabled ||
+            el.requestFullscreen ||
+            el.webkitRequestFullscreen
+          );
+        } catch (e) {
+          return false;
+        }
+      }
+      function isFS() {
+        return !!(
+          document.fullscreenElement || document.webkitFullscreenElement
+        );
+      }
+      function toggleFS() {
+        try {
+          if (isFS()) {
+            const x = document.exitFullscreen || document.webkitExitFullscreen;
+            if (x) x.call(document);
+          } else {
+            const el = document.documentElement;
+            const r =
+              el.requestFullscreen ||
+              el.webkitRequestFullscreen ||
+              el.webkitRequestFullScreen;
+            if (r) r.call(el);
+          }
+        } catch (e) {}
+      }
+      let swReloadArmed = false,
+        swReloaded = false;
+      function swMayReload() {
+        return !gameStarted || paused || S.over || S.won;
+      }
+      function armSwReload() {
+        if (swReloaded) return;
+        if (swMayReload()) {
+          swReloaded = true;
+          location.reload();
+        } else swReloadArmed = true;
+      }
+      function trySwReload() {
+        if (swReloadArmed && !swReloaded && swMayReload()) {
+          swReloaded = true;
+          location.reload();
+        }
+      }
+      function setPaused(on) {
+        paused = !!on;
+        trySwReload();
+        if (!AC) return;
+        try {
+          if (paused) {
+            if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
+            if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
+            if (CG) CG.gain.setValueAtTime(0, AC.currentTime);
+            if (AC.state === "running") {
+              const p = AC.suspend();
+              if (p && p.catch) p.catch(() => {});
+            }
+          } else if (!muted) {
+            const p = AC.resume();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
+      }
       function toggleMute() {
         muted = !muted;
-        try {
-          localStorage.setItem("fh_muted", muted ? "1" : "0");
-        } catch (e) {}
+        lsSet("fh_muted", muted ? "1" : "0");
+        applyMasterGain();
         if (muted && AC) {
-          if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
-          if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
-          if (CG) CG.gain.setValueAtTime(0, AC.currentTime);
+          try {
+            if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
+            if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
+            if (CG) CG.gain.setValueAtTime(0, AC.currentTime);
+          } catch (e) {}
         }
+      }
+      function cycleQuality() {
+        qMode = (qMode + 1) % 3;
+        lsSet("fh_qmode", String(qMode));
+        if (qMode === 1) quality = 2;
+        else if (qMode === 2) quality = 0;
+        qDpr = qMode === 2 ? 0.7 : 1;
+        applyDpr();
+      }
+      function setVol(v) {
+        vol = Math.max(0, Math.min(1, v));
+        lsSet("fh_vol", String(vol));
+        applyMasterGain();
+      }
+      function volSlider(btns) {
+        const list = btns || menuBtns();
+        const last = list[list.length - 1];
+        return {
+          x: last.x,
+          y: Math.min(last.y + last.h + 8, ch - safeB - 36),
+          w: last.w,
+          h: 28,
+        };
       }
       function menuBtns() {
         const cx = cw / 2,
-          cy = ch / 2;
-        return [
+          cy = ch / 2,
+          room = Math.max(220, ch - safeT - safeB - 90),
+          gap = Math.max(26, Math.min(40, (room / 8) | 0)),
+          h = Math.max(22, gap - 6),
+          w = Math.min(200, Math.max(160, cw - 48));
+        const rows = [
           {
-            x: cx - 90,
-            y: cy + 6,
-            w: 180,
-            h: 44,
             label: "Resume",
-            act: () => {
-              paused = false;
-              if (AC && AC.state === "running" && !muted) AC.resume();
-            },
+            act: () => setPaused(false),
           },
           {
-            x: cx - 90,
-            y: cy + 58,
-            w: 180,
-            h: 44,
             label: "Restart",
             act: () => {
               restart();
-              paused = false;
+              setPaused(false);
             },
           },
           {
-            x: cx - 90,
-            y: cy + 110,
-            w: 180,
-            h: 38,
-            label: "Sound: " + (muted ? "Off" : "On"),
+            label: "Mute: " + (muted ? "On" : "Off"),
             act: toggleMute,
           },
           {
-            x: cx - 90,
-            y: cy + 156,
-            w: 180,
-            h: 38,
-            label: "Replay Tutorial",
+            label: "Quality: " + QNAME[qMode],
+            act: cycleQuality,
+          },
+          {
+            label: "Shake/Flash: " + (fxOn ? "On" : "Off"),
             act: () => {
-              try {
-                localStorage.setItem("fh_tut", "0");
-              } catch (e) {}
-              tutStep = 0;
-              tutDone = false;
-              tutMoveDist = 0;
-              tutPaintDist = 0;
-              tutAttackDist = 0;
-              paused = false;
+              fxOn = !fxOn;
+              lsSet("fh_fx", fxOn ? "1" : "0");
             },
           },
         ];
+        if (canFS())
+          rows.push({
+            label: isFS() ? "Exit Fullscreen" : "Fullscreen",
+            act: toggleFS,
+          });
+        rows.push({
+          label: "Replay Tutorial",
+          act: () => {
+            lsSet("fh_tut", "0");
+            tutStep = 0;
+            tutDone = false;
+            tutMoveDist = 0;
+            tutPaintDist = 0;
+            tutAttackDist = 0;
+            tutAbilityUsed = false;
+            tutBannerT = 0;
+            setPaused(false);
+          },
+        });
+        const tot = rows.length * gap;
+        const y0 = Math.max(safeT + 52, cy - tot / 2 - 4);
+        return rows.map((r, i) => ({
+          x: cx - w / 2,
+          y: y0 + i * gap,
+          w,
+          h,
+          label: r.label,
+          act: r.act,
+        }));
       }
       const BS = 46,
         btn = (i) => ({
@@ -1500,23 +1828,31 @@
           hy4 = S.hy,
           pan = (hx4 - camx) / 400;
         if (idx === 0) {
-          shakeT = 0.15;
-          flashT = 0.3;
+          if (fxOn && !reduceMotion) {
+            shakeT = 0.15;
+            flashT = 0.3;
+          }
           snd(300, 0.3, 0.5, "sine", pan);
         } else if (idx === 1) {
-          shakeT = 0.1;
-          flashT = 0.25;
+          if (fxOn && !reduceMotion) {
+            shakeT = 0.1;
+            flashT = 0.25;
+          }
           odGlowT = 2.4;
           snd(500, 0.35, 0.5, "sawtooth", pan);
         } else if (idx === 2) {
-          shakeT = 0.28;
-          flashT = 0.55;
-          zoomPulse = 0.06;
+          if (fxOn && !reduceMotion) {
+            shakeT = 0.28;
+            flashT = 0.55;
+            zoomPulse = 0.06;
+          }
           snd(150, 0.4, 0.6, "square", pan);
         } else if (idx === 3) {
-          shakeT = 0.22;
-          flashT = 0.6;
-          zoomPulse = 0.05;
+          if (fxOn && !reduceMotion) {
+            shakeT = 0.22;
+            flashT = 0.6;
+            zoomPulse = 0.05;
+          }
           snd(700, 0.45, 0.6, "triangle", pan);
         }
       }
@@ -1539,18 +1875,18 @@
         }
         const pb = pauseBtn();
         if (x >= pb.x && x <= pb.x + pb.w && y >= pb.y && y <= pb.y + pb.h) {
-          paused = !paused;
-          if (AC) {
-            if (paused) {
-              if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
-              if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
-            }
-            paused ? AC.suspend() : AC.resume();
-          }
+          setPaused(!paused);
           return true;
         }
         if (pauseA > 0.5) {
-          for (const b of menuBtns())
+          const pBtns = menuBtns();
+          const vs = volSlider(pBtns);
+          if (x >= vs.x && x <= vs.x + vs.w && y >= vs.y && y <= vs.y + vs.h) {
+            dragVol = true;
+            setVol((x - vs.x) / vs.w);
+            return true;
+          }
+          for (const b of pBtns)
             if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
               b.act();
               return true;
@@ -1609,11 +1945,13 @@
         savedThisRun = false;
         waveAnnounceT = 0;
         slowMoT = 0;
-        if (AC) {
-          if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
-          if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
-          if (CG) CG.gain.setValueAtTime(0, AC.currentTime);
-        }
+        try {
+          if (AC) {
+            if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
+            if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
+            if (CG) CG.gain.setValueAtTime(0, AC.currentTime);
+          }
+        } catch (e) {}
       }
       const UPGRADES = [
         { id: 0, name: "Ant Speed", desc: "+12% ant movement speed" },
@@ -1641,11 +1979,14 @@
         paused = true;
         zoomPulse = 0.08;
         chromaticT = 0.3;
-        if (AC) {
-          if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
-          if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
-          AC.suspend();
-        }
+        try {
+          if (AC) {
+            if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
+            if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
+            const p = AC.suspend();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
       }
       function upgradeCardRect(ci) {
         const gap = 20,
@@ -1687,7 +2028,12 @@
         upgradeOpen = false;
         upgradeCards = null;
         paused = false;
-        if (AC && AC.state === "suspended") AC.resume();
+        try {
+          if (AC && AC.state === "suspended") {
+            const p = AC.resume();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
         snd(600, 0.3, 0.5, "triangle", 0);
         chromaticT = 0.3;
         upgradeRippleT = 0.6;
@@ -1701,24 +2047,19 @@
           return;
         }
         const k = e.key.toLowerCase();
-        if (k === "escape") {
-          if (!S.over && !upgradeOpen) {
-            paused = !paused;
-            if (AC) {
-              if (paused) {
-                if (DG) DG.gain.setValueAtTime(0, AC.currentTime);
-                if (TG) TG.gain.setValueAtTime(0, AC.currentTime);
-              }
-              paused ? AC.suspend() : AC.resume();
-            }
-          }
+        if (k === "escape" || k === "p") {
+          if (!S.over && !upgradeOpen) setPaused(!paused);
         } else if (paused || upgradeOpen) {
+          if (k === "m") toggleMute();
+          else if (k === "f") toggleFS();
         } else if (k === "q") triggerAbility(0);
         else if (k === " ") triggerAbility(1);
         else if (k === "e") triggerAbility(2);
         else if (k === "shift") triggerAbility(3);
         else if (k >= "1" && k <= "4") mode = +k;
         else if (k === "h") heat = !heat;
+        else if (k === "m") toggleMute();
+        else if (k === "f") toggleFS();
         else if (k === "r" && (S.over || S.won) && endA >= 0.9) restart();
         else keys[k] = true;
         if (k.startsWith("arrow") || k === " ") e.preventDefault();
@@ -1733,16 +2074,34 @@
         mId = null;
         jId = tpId = null;
         jx = jy = 0;
+        dragVol = false;
+        gpPrev = 0;
       }
-      addEventListener("blur", clearInputState);
+      function onHide() {
+        clearInputState();
+        if (gameStarted && !S.over && !S.won && !upgradeOpen) setPaused(true);
+        try {
+          if (AC && AC.state === "running") {
+            const p = AC.suspend();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
+      }
+      function onShow() {
+        last = performance.now();
+        applyDpr();
+        try {
+          if (AC && AC.state === "suspended" && !paused && !muted) {
+            const p = AC.resume();
+            if (p && p.catch) p.catch(() => {});
+          }
+        } catch (e) {}
+      }
+      addEventListener("blur", onHide);
+      addEventListener("pagehide", onHide);
       addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-          clearInputState();
-          if (AC && AC.state === "running") AC.suspend();
-        } else {
-          last = performance.now();
-          if (AC && AC.state === "suspended" && !paused) AC.resume();
-        }
+        if (document.hidden) onHide();
+        else onShow();
       });
       cv.addEventListener("mousedown", (e) => {
         if (!gameStarted) {
@@ -1762,12 +2121,18 @@
         paintTo(e.clientX, e.clientY);
       });
       addEventListener("mousemove", (e) => {
+        if (dragVol) {
+          const vs = volSlider();
+          setVol((e.clientX - vs.x) / vs.w);
+          return;
+        }
         if (painting && mId === null) {
           mouse = [e.clientX, e.clientY];
           paintTo(e.clientX, e.clientY);
         }
       });
       addEventListener("mouseup", () => {
+        dragVol = false;
         if (mId === null) {
           painting = false;
           pl = null;
@@ -1812,6 +2177,12 @@
         "touchmove",
         (e) => {
           e.preventDefault();
+          if (dragVol) {
+            const vs = volSlider();
+            const t = e.changedTouches[0];
+            if (t) setVol((t.clientX - vs.x) / vs.w);
+            return;
+          }
           for (const t of e.changedTouches) {
             if (t.identifier === jId) {
               let dx = t.clientX - jx0,
@@ -1836,6 +2207,7 @@
       );
       function tend(e) {
         e.preventDefault();
+        dragVol = false;
         for (const t of e.changedTouches) {
           if (t.identifier === jId) {
             jId = null;
@@ -1852,6 +2224,66 @@
       }
       cv.addEventListener("touchend", tend, { passive: false });
       cv.addEventListener("touchcancel", tend, { passive: false });
+      function pollGamepad() {
+        gpAx = gpAy = 0;
+        let pads;
+        try {
+          pads = navigator.getGamepads ? navigator.getGamepads() : null;
+        } catch (e) {
+          return;
+        }
+        if (!pads) return;
+        for (let i = 0; i < pads.length; i++) {
+          const gp = pads[i];
+          if (!gp) continue;
+          const ax0 = gp.axes[0] || 0,
+            ay0 = gp.axes[1] || 0,
+            ax1 = gp.axes[2] || 0,
+            ay1 = gp.axes[3] || 0;
+          const dz = 0.22;
+          const lx = Math.abs(ax0) > dz ? ax0 : 0,
+            ly = Math.abs(ay0) > dz ? ay0 : 0;
+          gpAx += lx;
+          gpAy += ly;
+          if (Math.abs(ax1) > dz || Math.abs(ay1) > dz) {
+            const sx = cw / 2 + ax1 * 80,
+              sy = ch / 2 + ay1 * 80;
+            if (!paused && gameStarted && !S.over && !S.won && !upgradeOpen)
+              paintTo(sx, sy);
+          }
+          let bits = 0;
+          const nb = Math.min(gp.buttons.length, 31);
+          for (let b = 0; b < nb; b++)
+            if (gp.buttons[b] && gp.buttons[b].pressed) bits |= 1 << b;
+          const edge = bits & ~gpPrev;
+          gpPrev = bits;
+          if (!gameStarted) {
+            if (edge) startGame();
+            continue;
+          }
+          if (edge & (1 << 9) || edge & (1 << 8)) {
+            if (!S.over && !upgradeOpen) setPaused(!paused);
+          }
+          if (paused || upgradeOpen || S.over || S.won) {
+            if ((S.over || S.won) && endA >= 0.9 && edge) restart();
+            continue;
+          }
+          if (edge & 1) triggerAbility(0);
+          if (edge & 2) triggerAbility(1);
+          if (edge & 4) triggerAbility(2);
+          if (edge & 8) triggerAbility(3);
+          if (edge & (1 << 4)) mode = mode <= 1 ? 4 : mode - 1;
+          if (edge & (1 << 5)) mode = mode >= 4 ? 1 : mode + 1;
+          if (gp.buttons[12] && gp.buttons[12].pressed) gpAy -= 1;
+          if (gp.buttons[13] && gp.buttons[13].pressed) gpAy += 1;
+          if (gp.buttons[14] && gp.buttons[14].pressed) gpAx -= 1;
+          if (gp.buttons[15] && gp.buttons[15].pressed) gpAx += 1;
+        }
+        if (gpAx > 1) gpAx = 1;
+        else if (gpAx < -1) gpAx = -1;
+        if (gpAy > 1) gpAy = 1;
+        else if (gpAy < -1) gpAy = -1;
+      }
       const COL = [
           "",
           "#ffb46a",
@@ -1882,12 +2314,15 @@
         ctx.fillStyle = "#0d0b07";
         ctx.fillRect(0, 0, cw, ch);
         const lowPh = performance.now() / 110;
-        const shx =
-            (shakeT > 0 ? (Math.random() - 0.5) * shakeT * 40 : 0) +
-            (shakeLowT > 0 ? Math.sin(lowPh) * shakeLowT * 14 : 0),
-          shy =
-            (shakeT > 0 ? (Math.random() - 0.5) * shakeT * 40 : 0) +
-            (shakeLowT > 0 ? Math.cos(lowPh * 0.8) * shakeLowT * 14 : 0);
+        const doFx = fxOn && !reduceMotion,
+          shx = doFx
+            ? (shakeT > 0 ? (Math.random() - 0.5) * shakeT * 40 : 0) +
+              (shakeLowT > 0 ? Math.sin(lowPh) * shakeLowT * 14 : 0)
+            : 0,
+          shy = doFx
+            ? (shakeT > 0 ? (Math.random() - 0.5) * shakeT * 40 : 0) +
+              (shakeLowT > 0 ? Math.cos(lowPh * 0.8) * shakeLowT * 14 : 0)
+            : 0;
         ctx.setTransform(
           dpr * zoom,
           0,
@@ -1898,10 +2333,12 @@
         );
         ctx.fillStyle = "#1c1812";
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = noisePat;
-        ctx.globalAlpha = 0.4;
-        ctx.fillRect(0, 0, W, H);
-        ctx.globalAlpha = 1;
+        if (noisePat) {
+          ctx.fillStyle = noisePat;
+          ctx.globalAlpha = 0.4;
+          ctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
         const P = S.P,
           a0 = P[0],
           a1 = P[1],
@@ -1934,10 +2371,12 @@
         ctx.strokeStyle = "#5a4a35";
         ctx.lineWidth = 4;
         ctx.strokeRect(0, 0, W, H);
-        const gr = ctx.createRadialGradient(S.NX, S.NY, 4, S.NX, S.NY, 40);
-        gr.addColorStop(0, "#ffe9a8");
-        gr.addColorStop(1, "rgba(120,80,30,.3)");
-        ctx.fillStyle = gr;
+        if (!nestGrad) {
+          nestGrad = ctx.createRadialGradient(S.NX, S.NY, 4, S.NX, S.NY, 40);
+          nestGrad.addColorStop(0, "#ffe9a8");
+          nestGrad.addColorStop(1, "rgba(120,80,30,.3)");
+        }
+        ctx.fillStyle = nestGrad;
         ctx.beginPath();
         ctx.arc(S.NX, S.NY, 40, 0, 6.2832);
         ctx.fill();
@@ -2180,14 +2619,21 @@
           ctx.arc(S.hx, S.hy, sgr, 0, 6.2832);
           ctx.stroke();
         }
-        const hg2 = ctx.createRadialGradient(S.hx, S.hy, 6, S.hx, S.hy, 22);
-        hg2.addColorStop(0, "rgba(198,106,255,.14)");
-        hg2.addColorStop(0.6, "rgba(255,214,106,.06)");
-        hg2.addColorStop(1, "rgba(198,106,255,0)");
-        ctx.fillStyle = hg2;
-        ctx.beginPath();
-        ctx.arc(S.hx, S.hy, 22, 0, 6.2832);
-        ctx.fill();
+        if (quality >= 1) {
+          ctx.save();
+          ctx.translate(S.hx, S.hy);
+          if (!queenGrad) {
+            queenGrad = ctx.createRadialGradient(0, 0, 6, 0, 0, 22);
+            queenGrad.addColorStop(0, "rgba(198,106,255,.14)");
+            queenGrad.addColorStop(0.6, "rgba(255,214,106,.06)");
+            queenGrad.addColorStop(1, "rgba(198,106,255,0)");
+          }
+          ctx.fillStyle = queenGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, 22, 0, 6.2832);
+          ctx.fill();
+          ctx.restore();
+        }
         if (painting && pl) {
           ctx.strokeStyle =
             mode === 1
@@ -2214,7 +2660,8 @@
           PLIFE = [0.35, 0.35, 0.55, 0.35, 0.4, 0.7, 0.5],
           PSZ = [2.5, 2.2, 4.5, 2.2, 3, 2.8, 2.2],
           pAlpha = Math.max(0.4, 1 - Math.min(curSpk, 40) * 0.012);
-        for (let k = 0; k < S.PN; k++)
+        const pStep = quality <= 0 ? 2 : 1;
+        for (let k = 0; k < S.PN; k += pStep)
           if (S.PL[k] > 0) {
             const pt2 = S.PT[k],
               lr = Math.max(0, Math.min(1, S.PL[k] / PLIFE[pt2])),
@@ -2222,7 +2669,7 @@
             ctx.globalAlpha = pAlpha * lr;
             ctx.fillStyle = PCOL[pt2];
             ctx.fillRect(S.PX[k] - ps / 2, S.PY[k] - ps / 2, ps, ps);
-            if ((pt2 === 3 || pt2 === 5) && lr > 0.3) {
+            if (quality >= 2 && (pt2 === 3 || pt2 === 5) && lr > 0.3) {
               ctx.globalAlpha = pAlpha * (1 - lr) * 0.5;
               ctx.beginPath();
               ctx.arc(S.PX[k], S.PY[k], ps * 1.8 * (1.4 - lr), 0, 6.2832);
@@ -2369,7 +2816,7 @@
             ctx.restore();
           }
         }
-        if (flashT > 0) {
+        if (doFx && flashT > 0) {
           ctx.fillStyle = "rgba(255,120,90," + flashT * 0.18 + ")";
           ctx.fillRect(0, 0, cw, ch);
         }
@@ -2378,7 +2825,7 @@
           ctx.fillStyle = "rgba(255,207,74," + oa2 * 0.14 + ")";
           ctx.fillRect(0, 0, cw, ch);
         }
-        if (chromaticT > 0) {
+        if (doFx && chromaticT > 0) {
           const ca = chromaticT / 0.4,
             cof = ca * 3;
           ctx.globalCompositeOperation = "lighter";
@@ -2590,15 +3037,17 @@
           ctx.scale(sc, sc);
           ctx.translate(-cx2, -cy2);
           if (on) {
-            ctx.shadowColor =
-              i === 0
-                ? "#7dff6a"
-                : i === 1
-                  ? "#ff5a3c"
-                  : i === 2
-                    ? "#5b9bff"
-                    : "#f0e6d0";
-            ctx.shadowBlur = 10;
+            if (quality >= 2) {
+              ctx.shadowColor =
+                i === 0
+                  ? "#7dff6a"
+                  : i === 1
+                    ? "#ff5a3c"
+                    : i === 2
+                      ? "#5b9bff"
+                      : "#f0e6d0";
+              ctx.shadowBlur = 10;
+            }
           }
           ctx.fillStyle = on ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.45)";
           ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -2668,7 +3117,7 @@
           ctx.fill();
         }
         if (S.over || S.won) {
-          endA = Math.min(1, endA + 0.03);
+          endA = Math.min(1, endA + dt * 1.6);
           ctx.globalAlpha = endA;
           ctx.fillStyle = S.won ? "rgba(10,30,15,.75)" : "rgba(20,6,6,.72)";
           ctx.fillRect(0, 0, cw, ch);
@@ -2774,10 +3223,13 @@
           const pe = 1 - Math.pow(1 - pauseA, 3),
             oy = (1 - pe) * 20;
           ctx.globalAlpha = pauseA;
+          ctx.textBaseline = "middle";
+          const pBtns = menuBtns();
+          const topY = pBtns[0] ? pBtns[0].y : ch / 2;
           ctx.fillStyle = "#fff";
-          ctx.font = "bold 24px sans-serif";
-          ctx.fillText("PAUSED", cw / 2, ch / 2 - 56 + oy);
-          ctx.font = "13px sans-serif";
+          ctx.font = "bold 22px sans-serif";
+          ctx.fillText("PAUSED", cw / 2, topY - 40 + oy);
+          ctx.font = "12px sans-serif";
           ctx.fillText(
             "Score " +
               (S.score | 0) +
@@ -2786,18 +3238,27 @@
               "  Ants " +
               (S.cnt[1] + S.cnt[2]),
             cw / 2,
-            ch / 2 - 28 + oy,
+            topY - 18 + oy,
           );
-          ctx.textBaseline = "middle";
-          for (const b of menuBtns()) {
+          for (const b of pBtns) {
             ctx.fillStyle = "rgba(255,255,255,.15)";
             ctx.fillRect(b.x, b.y + oy, b.w, b.h);
             ctx.strokeStyle = "rgba(255,255,255,.4)";
             ctx.strokeRect(b.x, b.y + oy, b.w, b.h);
             ctx.fillStyle = "#fff";
-            ctx.font = "bold 16px sans-serif";
+            ctx.font = "bold 15px sans-serif";
             ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + oy);
           }
+          const vs = volSlider(pBtns);
+          ctx.fillStyle = "rgba(255,255,255,.55)";
+          ctx.font = "12px sans-serif";
+          ctx.fillText("Volume", vs.x + vs.w / 2, vs.y + oy + 2);
+          ctx.fillStyle = "rgba(255,255,255,.18)";
+          ctx.fillRect(vs.x, vs.y + 12 + oy, vs.w, 8);
+          ctx.fillStyle = "#c6a0ff";
+          ctx.fillRect(vs.x, vs.y + 12 + oy, vs.w * vol, 8);
+          ctx.strokeStyle = "rgba(255,255,255,.4)";
+          ctx.strokeRect(vs.x, vs.y + 12 + oy, vs.w, 8);
           ctx.textBaseline = "top";
           ctx.globalAlpha = 1;
         }
@@ -2867,10 +3328,12 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.fillStyle = "#0d0b07";
         ctx.fillRect(0, 0, cw, ch);
-        ctx.fillStyle = noisePat;
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(0, 0, cw, ch);
-        ctx.globalAlpha = 1;
+        if (noisePat) {
+          ctx.fillStyle = noisePat;
+          ctx.globalAlpha = 0.3;
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.globalAlpha = 1;
+        }
         const vig = ctx.createRadialGradient(
           cw / 2,
           ch / 2,
@@ -2935,9 +3398,9 @@
         ctx.fillText(
           isTouchDevice
             ? "Tap to begin — drag to move, drag to paint"
-            : "Click or press Enter/Space to begin — WASD to move",
+            : "Click / Enter / gamepad — WASD to move",
           cx,
-          ch - 30,
+          ch - 30 - safeB,
         );
         ctx.textAlign = "left";
       }
@@ -2945,34 +3408,63 @@
       /* ==================== GAME LOOP: camera, physics tick, audio reactivity ==================== */
       function frame(t) {
         requestAnimationFrame(frame);
+        if (!ctx) return;
         let dt = (t - last) / 1000;
         last = t;
         if (!(dt > 0)) dt = 0.016;
         if (dt > 0.05) dt = 0.05;
+        if (swReloadArmed) trySwReload();
+        pollGamepad();
+        if (
+          dpr !== lastDpr ||
+          cw !== lastCw ||
+          ch !== lastCh ||
+          (window.devicePixelRatio || 1) !== lastDpr
+        ) {
+          const nd = Math.min(
+            window.devicePixelRatio || 1,
+            qMode === 2
+              ? 0.85
+              : qMode === 1
+                ? 2
+                : Math.max(0.6, Math.min(2, qDpr)),
+          );
+          if (Math.abs(nd - dpr) > 0.04) applyDpr();
+        }
         if (!gameStarted) {
+          trySwReload();
           drawTitle(dt);
           return;
         }
-        fps += (1 / dt - fps) * 0.05;
+        fps += (1 / dt - fps) * 0.08;
         S.ds = fps < 42 ? 2 : fps > 58 ? 1 : S.ds;
-        qGoodT = fps >= 52 ? qGoodT + dt : 0;
-        qBadT = fps < 38 ? qBadT + dt : 0;
-        if (qBadT > 1.2 && quality > 0) {
-          quality--;
-          qBadT = 0;
-          qGoodT = 0;
-        } else if (qGoodT > 2.5 && quality < 2) {
-          quality++;
-          qGoodT = 0;
-          qBadT = 0;
+        if (qMode === 0) {
+          qGoodT = fps >= 52 ? qGoodT + dt : 0;
+          qBadT = fps < 38 ? qBadT + dt : 0;
+          if (qBadT > 1.2 && quality > 0) {
+            quality--;
+            qDpr = Math.max(0.6, qDpr - 0.2);
+            applyDpr();
+            qBadT = 0;
+            qGoodT = 0;
+          } else if (qGoodT > 2.5 && quality < 2) {
+            quality++;
+            qDpr = Math.min(2, qDpr + 0.15);
+            applyDpr();
+            qGoodT = 0;
+            qBadT = 0;
+          }
+        } else {
+          quality = qMode === 1 ? 2 : 0;
+          qDpr = qMode === 2 ? 0.7 : Math.min(2, window.devicePixelRatio || 1);
         }
         if (hitStopT > 0) {
           hitStopT -= dt;
-          dt *= 0.6;
+          if (fxOn && !reduceMotion) dt *= 0.6;
         }
         if (slowMoT > 0) {
           slowMoT -= dt;
-          dt *= 0.4;
+          if (fxOn && !reduceMotion) dt *= 0.4;
         }
         shakeT = Math.max(0, shakeT - dt);
         flashT = Math.max(0, flashT - dt / 0.2);
@@ -2983,11 +3475,17 @@
         let ax =
             (keys.d || keys.arrowright ? 1 : 0) -
             (keys.a || keys.arrowleft ? 1 : 0) +
-            jx,
+            jx +
+            gpAx,
           ay =
             (keys.s || keys.arrowdown ? 1 : 0) -
             (keys.w || keys.arrowup ? 1 : 0) +
-            jy;
+            jy +
+            gpAy;
+        if (ax > 1) ax = 1;
+        else if (ax < -1) ax = -1;
+        if (ay > 1) ay = 1;
+        else if (ay < -1) ay = -1;
         if (!paused) S.step(dt, ax, ay);
         else {
           draw();
@@ -3000,6 +3498,7 @@
         if ((S.over || S.won) && !savedThisRun) {
           savedThisRun = true;
           saveBest();
+          trySwReload();
         }
         if (S.harvestBoostT > 3.9 && harvestToastT <= 0) {
           harvestToastT = 2.2;
@@ -3060,11 +3559,13 @@
               (S.hx - camx) / 400,
             );
           lastHitFxT = t;
-          shakeT = 0.12 + 0.18 * inten;
-          shakeLowT = Math.max(shakeLowT, inten * 0.5);
-          flashT = 0.5 + 0.6 * inten;
-          hitStopT = 0.02 + 0.05 * inten;
-          zoomPulse = 0.03 + 0.04 * inten;
+          if (fxOn && !reduceMotion) {
+            shakeT = 0.12 + 0.18 * inten;
+            shakeLowT = Math.max(shakeLowT, inten * 0.5);
+            flashT = 0.5 + 0.6 * inten;
+            hitStopT = 0.02 + 0.05 * inten;
+            zoomPulse = 0.03 + 0.04 * inten;
+          }
           chaosG = Math.min(1, chaosG + inten * 0.6);
         }
         lastSpk = spk;
@@ -3154,9 +3655,7 @@
           if (tutBannerT > 2.6) {
             tutStep = 5;
             tutDone = true;
-            try {
-              localStorage.setItem("fh_tut", "1");
-            } catch (e) {}
+            lsSet("fh_tut", "1");
           }
         }
         lastHx = S.hx;
@@ -3182,6 +3681,51 @@
         draw();
       }
       requestAnimationFrame(frame);
+      addEventListener("load", () => {
+        try {
+          const h =
+            location.hostname === "localhost" ||
+            location.hostname === "127.0.0.1";
+          if (
+            !("serviceWorker" in navigator) ||
+            (location.protocol !== "https:" && !h)
+          )
+            return;
+          const had = !!navigator.serviceWorker.controller;
+          navigator.serviceWorker
+            .register("sw.js")
+            .then((reg) => {
+              try {
+                if (reg.waiting) armSwReload();
+                reg.addEventListener("updatefound", () => {
+                  const w = reg.installing;
+                  if (!w) return;
+                  w.addEventListener("statechange", () => {
+                    if (
+                      w.state === "installed" &&
+                      navigator.serviceWorker.controller
+                    )
+                      armSwReload();
+                  });
+                });
+                navigator.serviceWorker.addEventListener(
+                  "controllerchange",
+                  () => {
+                    if (!had) return;
+                    armSwReload();
+                  },
+                );
+                addEventListener("visibilitychange", () => {
+                  if (!document.hidden)
+                    try {
+                      reg.update();
+                    } catch (e) {}
+                });
+              } catch (e) {}
+            })
+            .catch(() => {});
+        } catch (e) {}
+      });
     </script>
   </body>
 </html>
